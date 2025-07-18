@@ -2,9 +2,8 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <title>テキスト/Wordファイル文字化け暗号化</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+    <title>テキストファイル暗号化</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -41,67 +40,45 @@
 </head>
 <body>
     <div class="container">
-        <h2>テキスト/Wordファイル文字化け暗号化</h2>
-        <input type="file" id="fileInput" accept=".txt,.docx">
-        <input type="number" id="shift" placeholder="ずらす文字数（例: 3）" value="3">
-        <button onclick="scrambleFile()">文字化けさせてダウンロード</button>
+        <h2>テキストファイル暗号化</h2>
+        <input type="file" id="fileInput" accept=".txt">
+        <input type="password" id="password" placeholder="パスワードを入力">
+        <button onclick="encryptFile()">暗号化してダウンロード</button>
         <p id="message"></p>
     </div>
 
     <script>
-        function scrambleText(text, shift) {
-            let scrambled = '';
-            for (let i = 0; i < text.length; i++) {
-                const charCode = text.charCodeAt(i);
-                if (charCode >= 32 && charCode <= 126) {
-                    let newCharCode = charCode + shift;
-                    if (newCharCode > 126) newCharCode = 32 + ((newCharCode - 32) % (126 - 32 + 1));
-                    scrambled += String.fromCharCode(newCharCode);
-                } else {
-                    scrambled += text[i];
-                }
-            }
-            return scrambled;
-        }
-
-        function scrambleFile() {
+        function encryptFile() {
             const fileInput = document.getElementById('fileInput');
-            const shift = parseInt(document.getElementById('shift').value) || 3;
+            const password = document.getElementById('password').value;
             const message = document.getElementById('message');
 
             if (!fileInput.files[0]) {
                 message.textContent = 'ファイルを選択してください。';
                 return;
             }
-
-            const file = fileInput.files[0];
-            const fileName = file.name.toLowerCase();
-            const reader = new FileReader();
-
-            if (fileName.endsWith('.txt')) {
-                reader.onload = function(event) {
-                    const text = event.target.result;
-                    const scrambled = scrambleText(text, shift);
-                    const blob = new Blob([scrambled], { type: 'text/plain' });
-                    saveAs(blob, 'scrambled.txt');
-                    message.textContent = '文字化け暗号化が完了しました。ファイルがダウンロードされます。';
-                };
-                reader.readAsText(file);
-            } else if (fileName.endsWith('.docx')) {
-                reader.onload = async function(event) {
-                    const arrayBuffer = event.target.result;
-                    const zip = await JSZip.loadAsync(arrayBuffer);
-                    let documentXml = await zip.file('word/document.xml').async('string');
-                    const scrambledXml = scrambleText(documentXml, shift);
-                    zip.file('word/document.xml', scrambledXml);
-                    const blob = await zip.generateAsync({ type: 'blob' });
-                    saveAs(blob, 'scrambled.docx');
-                    message.textContent = '文字化け暗号化が完了しました。ファイルがダウンロードされます。';
-                };
-                reader.readAsArrayBuffer(file);
-            } else {
-                message.textContent = 'サポートされていないファイル形式です（.txtまたは.docxを選択してください）。';
+            if (!password) {
+                message.textContent = 'パスワードを入力してください。';
+                return;
             }
+
+            const reader = new FileReader();
+            reader.onload = function(event) {
+                const text = event.target.result;
+                const encrypted = CryptoJS.AES.encrypt(text, password).toString();
+                
+                // 暗号化されたデータをファイルとしてダウンロード
+                const blob = new Blob([encrypted], { type: 'text/plain' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'encrypted.txt';
+                a.click();
+                URL.revokeObjectURL(url);
+                
+                message.textContent = '暗号化が完了しました。ファイルがダウンロードされます。';
+            };
+            reader.readAsText(fileInput.files[0]);
         }
     </script>
 </body>
