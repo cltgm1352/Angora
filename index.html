@@ -2,8 +2,9 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <title>テキストファイル暗号化</title>
+    <title>ファイル暗号化</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -40,8 +41,8 @@
 </head>
 <body>
     <div class="container">
-        <h2>テキストファイル暗号化</h2>
-        <input type="file" id="fileInput" accept=".txt">
+        <h2>ファイル暗号化</h2>
+        <input type="file" id="fileInput">
         <input type="password" id="password" placeholder="パスワードを入力">
         <button onclick="encryptFile()">暗号化してダウンロード</button>
         <p id="message"></p>
@@ -62,23 +63,42 @@
                 return;
             }
 
+            const file = fileInput.files[0];
+            const fileName = file.name;
+            const extension = fileName.split('.').pop().toLowerCase();
+            const textExtensions = ['txt', 'csv', 'json', 'xml', 'html', 'js', 'css', 'md', 'py', 'java', 'c', 'cpp', 'h', 'sql'];
+
             const reader = new FileReader();
-            reader.onload = function(event) {
-                const text = event.target.result;
-                const encrypted = CryptoJS.AES.encrypt(text, password).toString();
-                
-                // 暗号化されたデータをファイルとしてダウンロード
-                const blob = new Blob([encrypted], { type: 'text/plain' });
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = 'encrypted.txt';
-                a.click();
-                URL.revokeObjectURL(url);
-                
-                message.textContent = '暗号化が完了しました。ファイルがダウンロードされます。';
-            };
-            reader.readAsText(fileInput.files[0]);
+
+            if (textExtensions.includes(extension)) {
+                // テキストファイルの場合
+                reader.onload = function(event) {
+                    const text = event.target.result;
+                    const encrypted = CryptoJS.AES.encrypt(text, password).toString();
+                    const metadata = JSON.stringify({ originalExtension: extension, isBinary: false });
+                    const output = `${metadata}\n---\n${encrypted}`;
+                    
+                    const blob = new Blob([output], { type: 'text/plain' });
+                    saveAs(blob, `encrypted_${fileName}.txt`);
+                    message.textContent = '暗号化が完了しました。ファイルがダウンロードされます。';
+                };
+                reader.readAsText(file);
+            } else {
+                // バイナリファイルの場合
+                reader.onload = function(event) {
+                    const arrayBuffer = event.target.result;
+                    const wordArray = CryptoJS.lib.WordArray.create(new Uint8Array(arrayBuffer));
+                    const base64 = CryptoJS.enc.Base64.stringify(wordArray);
+                    const encrypted = CryptoJS.AES.encrypt(base64, password).toString();
+                    const metadata = JSON.stringify({ originalExtension: extension, isBinary: true });
+                    const output = `${metadata}\n---\n${encrypted}`;
+                    
+                    const blob = new Blob([output], { type: 'text/plain' });
+                    saveAs(blob, `encrypted_${fileName}.txt`);
+                    message.textContent = '暗号化が完了しました。ファイルがダウンロードされます。';
+                };
+                reader.readAsArrayBuffer(file);
+            }
         }
     </script>
 </body>
