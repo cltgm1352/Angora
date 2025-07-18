@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>テキスト/Wordファイル文字化け暗号化</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background-color: #f0f0f0;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+            width: 400px;
+            text-align: center;
+        }
+        input, button {
+            margin: 10px 0;
+            padding: 8px;
+            width: 100%;
+            box-sizing: border-box;
+        }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>テキスト/Wordファイル文字化け暗号化</h2>
+        <input type="file" id="fileInput" accept=".txt,.docx">
+        <input type="number" id="shift" placeholder="ずらす文字数（例: 3）" value="3">
+        <button onclick="scrambleFile()">文字化けさせてダウンロード</button>
+        <p id="message"></p>
+    </div>
+
+    <script>
+        function scrambleText(text, shift) {
+            let scrambled = '';
+            for (let i = 0; i < text.length; i++) {
+                const charCode = text.charCodeAt(i);
+                if (charCode >= 32 && charCode <= 126) {
+                    let newCharCode = charCode + shift;
+                    if (newCharCode > 126) newCharCode = 32 + ((newCharCode - 32) % (126 - 32 + 1));
+                    scrambled += String.fromCharCode(newCharCode);
+                } else {
+                    scrambled += text[i];
+                }
+            }
+            return scrambled;
+        }
+
+        function scrambleFile() {
+            const fileInput = document.getElementById('fileInput');
+            const shift = parseInt(document.getElementById('shift').value) || 3;
+            const message = document.getElementById('message');
+
+            if (!fileInput.files[0]) {
+                message.textContent = 'ファイルを選択してください。';
+                return;
+            }
+
+            const file = fileInput.files[0];
+            const fileName = file.name.toLowerCase();
+            const reader = new FileReader();
+
+            if (fileName.endsWith('.txt')) {
+                reader.onload = function(event) {
+                    const text = event.target.result;
+                    const scrambled = scrambleText(text, shift);
+                    const blob = new Blob([scrambled], { type: 'text/plain' });
+                    saveAs(blob, 'scrambled.txt');
+                    message.textContent = '文字化け暗号化が完了しました。ファイルがダウンロードされます。';
+                };
+                reader.readAsText(file);
+            } else if (fileName.endsWith('.docx')) {
+                reader.onload = async function(event) {
+                    const arrayBuffer = event.target.result;
+                    const zip = await JSZip.loadAsync(arrayBuffer);
+                    let documentXml = await zip.file('word/document.xml').async('string');
+                    const scrambledXml = scrambleText(documentXml, shift);
+                    zip.file('word/document.xml', scrambledXml);
+                    const blob = await zip.generateAsync({ type: 'blob' });
+                    saveAs(blob, 'scrambled.docx');
+                    message.textContent = '文字化け暗号化が完了しました。ファイルがダウンロードされます。';
+                };
+                reader.readAsArrayBuffer(file);
+            } else {
+                message.textContent = 'サポートされていないファイル形式です（.txtまたは.docxを選択してください）。';
+            }
+        }
+    </script>
+</body>
+</html>
